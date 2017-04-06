@@ -7,6 +7,47 @@
 #include <tchar.h>
 #include <windows.h>
 
+class TextDocument{
+public:
+    bool init(char *filename);
+    bool init(HANDLE filename);
+    bool init_linebuffer();
+    ULONG getline(ULONG lineo, char *buf, size_t len);
+    ULONG linecount();
+private:
+
+    char *buffer;
+    int length;
+};
+
+bool TextDocument::init(char *filename){
+    HANDLE hfile;
+    hfile = CreateFile(filename, GENERIC_READ,FILE_SHARE_READ, 0, OPEN_EXISTING, 0,0);
+
+    if(hfile == INVALID_HANDLE_VALUE)
+        return false;
+
+    return init(hfile);
+}
+
+bool TextDocument::init(HANDLE hfile){
+    ULONG numread;
+
+    if((length = GetFileSize(hfile, 0)) == 0)
+        return false;
+    //new line buffer
+    if((buffer = new char[length]) == 0)
+        return false;
+
+    //read file into memory
+    ReadFile(hfile, buffer, length, &numread, 0);
+
+    //find where each line starts
+    //init_linebuffer();
+
+    CloseHandle(hfile);
+    return true;
+}
 /*  Declare Windows procedure  */
 LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
 
@@ -50,12 +91,12 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
     hwnd = CreateWindowEx (
            0,                   /* Extended possibilites for variation */
            szClassName,         /* Classname */
-           _T("Text Edit"),       /* Title Text */
+           _T("Text Editor"),       /* Title Text */
            WS_OVERLAPPEDWINDOW, /* default window */
            CW_USEDEFAULT,       /* Windows decides the position */
            CW_USEDEFAULT,       /* where the window ends up on the screen */
-           544,                 /* The programs width */
-           375,                 /* and height in pixels */
+           CW_USEDEFAULT,                 /* The programs width */
+           CW_USEDEFAULT,                 /* and height in pixels */
            HWND_DESKTOP,        /* The window is a child-window to desktop */
            NULL,                /* No menu */
            hThisInstance,       /* Program Instance handler */
@@ -83,6 +124,7 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 
 LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    RECT rcClient;
     switch (message)                  /* handle the messages */
     {
 
@@ -97,7 +139,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 
             AppendMenu(hFile, MF_STRING, NULL, "Open");
             AppendMenu(hFile, MF_STRING, NULL, "Save");
-            AppendMenu(hFile, MF_STRING, , "Exit");
+            AppendMenu(hFile, MF_STRING, NULL,"Exit");
 
             SetMenu(hwnd, hMenubar);
 
@@ -105,11 +147,21 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
             TextArea = CreateWindow("Edit",
                                     "",
                                     WS_BORDER | WS_CHILD | WS_VISIBLE,
-                                    0, 0, 554, 375,
+                                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
                                     hwnd,
                                     NULL, NULL, NULL);
             break;
         }
+
+        case WM_SIZE:
+            GetClientRect(hwnd, &rcClient);
+            MoveWindow(TextArea,
+                       rcClient->right,
+                       0,
+                       rcClient->right,
+                       rcClient->bottom,
+                       TRUE);
+            return 0;
 
 
         case WM_DESTROY:
@@ -117,8 +169,11 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
             break;
         default:                      /* for messages that we don't deal with */
             return DefWindowProc (hwnd, message, wParam, lParam);
+
+
     }
+
+
 
     return 0;
 }
-
