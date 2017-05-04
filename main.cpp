@@ -1,179 +1,177 @@
-#if defined(UNICODE) && !defined(_UNICODE)
-    #define _UNICODE
-#elif defined(_UNICODE) && !defined(UNICODE)
-    #define UNICODE
-#endif
+#define WIN32_LEAN_AND_MEAN
+#define STRICT
 
-#include <tchar.h>
-#include <windows.h>
+#include <Windows.h>
+#include <iostream>
+#include <fstream>
 
-class TextDocument{
-public:
-    bool init(char *filename);
-    bool init(HANDLE filename);
-    bool init_linebuffer();
-    ULONG getline(ULONG lineo, char *buf, size_t len);
-    ULONG linecount();
-private:
+#define IDM_FILE		1000
+#define IDM_FILE_NEW	1001
+#define IDM_FILE_OPEN	1002
+#define IDM_FILE_SAVE	1003
+#define IDM_FILE_SAVEAS	1004
+#define IDM_FILE_PRINT	1005
+#define IDM_FILE_EXIT	1006
+#define IDM_EDIT		1010
+#define IDM_EDIT_COPY	1011
+#define IDM_EDIT_PASTE	1012
+#define IDM_EDIT_DELETE	1013
 
-    char *buffer;
-    int length;
-};
+#define IDC_EDIT		2000
 
-bool TextDocument::init(char *filename){
-    HANDLE hfile;
-    hfile = CreateFile(filename, GENERIC_READ,FILE_SHARE_READ, 0, OPEN_EXISTING, 0,0);
+LRESULT _stdcall WndProc(HWND mainWindow, UINT message, WPARAM wParam, LPARAM lParam);
 
-    if(hfile == INVALID_HANDLE_VALUE)
-        return false;
-
-    return init(hfile);
-}
-
-bool TextDocument::init(HANDLE hfile){
-    ULONG numread;
-
-    if((length = GetFileSize(hfile, 0)) == 0)
-        return false;
-    //new line buffer
-    if((buffer = new char[length]) == 0)
-        return false;
-
-    //read file into memory
-    ReadFile(hfile, buffer, length, &numread, 0);
-
-    //find where each line starts
-    //init_linebuffer();
-
-    CloseHandle(hfile);
-    return true;
-}
-/*  Declare Windows procedure  */
-LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
-
-/*  Make the class name into a global variable  */
-TCHAR szClassName[ ] = _T("CodeBlocksWindowsApp");
-
-//Creates the area in the window where the text will appear
-HWND TextArea;
-
-int WINAPI WinMain (HINSTANCE hThisInstance,
-                     HINSTANCE hPrevInstance,
-                     LPSTR lpszArgument,
-                     int nCmdShow)
+int _stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-    HWND hwnd;               /* This is the handle for our window */
-    MSG messages;            /* Here messages to the application are saved */
-    WNDCLASSEX wincl;        /* Data structure for the windowclass */
+	int retval = 0;
 
-    /* The Window structure */
-    wincl.hInstance = hThisInstance;
-    wincl.lpszClassName = szClassName;
-    wincl.lpfnWndProc = WindowProcedure;      /* This function is called by windows */
-    wincl.style = CS_DBLCLKS;                 /* Catch double-clicks */
-    wincl.cbSize = sizeof (WNDCLASSEX);
+	//Defines Window Class
+	WNDCLASSEX wincl;
+	ZeroMemory(&wincl, sizeof(wincl));
+	wincl.cbSize = sizeof(wincl);
+	wincl.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wincl.hIcon = wincl.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
+	wincl.hInstance = hInstance;
+	wincl.lpszClassName = L"Text_Editor";
+	wincl.style = CS_HREDRAW | CS_VREDRAW;
+	wincl.lpfnWndProc = WndProc;
 
-    /* Use default icon and mouse-pointer */
-    wincl.hIcon = LoadIcon (NULL, IDI_APPLICATION);
-    wincl.hIconSm = LoadIcon (NULL, IDI_APPLICATION);
-    wincl.hCursor = LoadCursor (NULL, IDC_ARROW);
-    wincl.lpszMenuName = NULL;                 /* No menu */
-    wincl.cbClsExtra = 0;                      /* No extra bytes after the window class */
-    wincl.cbWndExtra = 0;                      /* structure or the window instance */
-    /* Use Windows's default colour as the background of the window */
-    wincl.hbrBackground = (HBRUSH) COLOR_BACKGROUND;
+	if (RegisterClassEx(&wincl))
+	{
+		HMENU hMenu = CreateMenu();
+		HMENU hFileMenu = CreateMenu();
+		HMENU hEditMenu = CreateMenu();
+		HMENU hFormatMenu = CreateMenu();
 
-    /* Register the window class, and if it fails quit the program */
-    if (!RegisterClassEx (&wincl))
-        return 0;
+		//Appending the menu bar
+		AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
+		AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
+		AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFormatMenu, L"&Format");
 
-    /* The class is registered, let's create the program*/
-    hwnd = CreateWindowEx (
-           0,                   /* Extended possibilites for variation */
-           szClassName,         /* Classname */
-           _T("Text Editor"),       /* Title Text */
-           WS_OVERLAPPEDWINDOW, /* default window */
-           CW_USEDEFAULT,       /* Windows decides the position */
-           CW_USEDEFAULT,       /* where the window ends up on the screen */
-           CW_USEDEFAULT,                 /* The programs width */
-           CW_USEDEFAULT,                 /* and height in pixels */
-           HWND_DESKTOP,        /* The window is a child-window to desktop */
-           NULL,                /* No menu */
-           hThisInstance,       /* Program Instance handler */
-           NULL                 /* No Window Creation data */
-           );
+		//Appending the File Dropdown menu
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New");
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open");
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save");
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVEAS, L"Save &AS");
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_PRINT, L"&Print");
+		AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
 
-    /* Make the window visible on the screen */
-    ShowWindow (hwnd, nCmdShow);
+		//Appending the Edit Menu
+		AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Copy");
+		AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Paste");
+		AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_DELETE, L"&Delete");
 
-    /* Run the message loop. It will run until GetMessage() returns 0 */
-    while (GetMessage (&messages, NULL, 0, 0))
-    {
-        /* Translate virtual-key messages into character messages */
-        TranslateMessage(&messages);
-        /* Send message to WindowProcedure */
-        DispatchMessage(&messages);
-    }
+		HWND mainWindow = CreateWindowEx (WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW,
+									L"Text_Editor",
+									L"Untitled",
+									WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									NULL,
+									hMenu,
+									hInstance,
+									NULL);
 
-    /* The program return-value is 0 - The value that PostQuitMessage() gave */
-    return messages.wParam;
+		if (mainWindow)
+		{
+			MSG wMessage;
+			while (GetMessage(&wMessage, nullptr, 0, 0) > 0)
+			{
+				TranslateMessage(&wMessage);
+				DispatchMessage(&wMessage);
+			}
+		}
+		UnregisterClass(L"Text_Editor", hInstance);
+	}
+
+
+	return retval;
 }
 
-
-/*  This function is called by the Windows function DispatchMessage()  */
-
-LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT _stdcall WndProc(HWND mainWindow, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    RECT rcClient;
-    switch (message)                  /* handle the messages */
-    {
+	LRESULT retval = S_OK;
+	static HWND childWindow;
+	switch (message)
+	{
+	case WM_CREATE:
+		childWindow = CreateWindowEx(0,
+									L"Edit",
+									nullptr,
+									WS_CHILD | WS_VISIBLE | ES_LEFT |ES_MULTILINE | WS_VSCROLL | ES_AUTOVSCROLL | WS_HSCROLL | ES_AUTOHSCROLL,
+									0,
+									0,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									mainWindow,
+									(HMENU)IDC_EDIT,
+									(HINSTANCE)GetWindowLong(mainWindow, GWLP_HINSTANCE),
+									nullptr
+									);
+		if(childWindow == nullptr)
+			retval = E_FAIL;
+		break;
 
-        case WM_CREATE:{
-            //Creates and shows the menu bar at the top of the screen
-            HMENU hMenubar = CreateMenu();
-            HMENU hFile = CreateMenu();
-            HMENU hoptions = CreateMenu();
+	case WM_SETFOCUS:
+		SetFocus(childWindow);
+		break;
 
-            AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFile, "File");
-            AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hoptions, "Options");
+	case WM_SIZE:
+		MoveWindow(childWindow, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
+		break;
 
-            AppendMenu(hFile, MF_STRING, NULL, "Open");
-            AppendMenu(hFile, MF_STRING, NULL, "Save");
-            AppendMenu(hFile, MF_STRING, NULL,"Exit");
+	case WM_CLOSE:
+		DestroyWindow(mainWindow);
+		break;
 
-            SetMenu(hwnd, hMenubar);
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
 
-            //Creates the area that will display the text and allow the user to edit it
-            TextArea = CreateWindow("Edit",
-                                    "",
-                                    WS_BORDER | WS_CHILD | WS_VISIBLE,
-                                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-                                    hwnd,
-                                    NULL, NULL, NULL);
-            break;
-        }
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDM_FILE_NEW:
+			EnableMenuItem(GetMenu(mainWindow), IDM_FILE_SAVEAS, MF_BYCOMMAND | MF_DISABLED);
+			SendMessage(childWindow, WM_SETTEXT, 0, (LPARAM)L"");
+			SendMessage(childWindow, EM_SETMODIFY, FALSE, 0);
+			break;
 
-        case WM_SIZE:
-            GetClientRect(hwnd, &rcClient);
-            MoveWindow(TextArea,
-                       rcClient->right,
-                       0,
-                       rcClient->right,
-                       rcClient->bottom,
-                       TRUE);
-            return 0;
+		case IDM_FILE_OPEN:
+			break;
 
+		case IDM_FILE_SAVE:
 
-        case WM_DESTROY:
-            PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
-            break;
-        default:                      /* for messages that we don't deal with */
-            return DefWindowProc (hwnd, message, wParam, lParam);
+			break;
 
+		case IDM_FILE_EXIT:
+			DestroyWindow(mainWindow);
+			break;
 
-    }
+		case IDC_EDIT:
+			switch (HIWORD(wParam))
+			{
+			case EN_CHANGE:
+				EnableMenuItem(GetMenu(mainWindow), IDM_FILE_SAVEAS, MF_BYCOMMAND | MF_ENABLED);
+				break;
+			default:
+				retval = DefWindowProc(mainWindow, message, wParam, lParam);
+				break;
+			}
 
+		default:
+			retval = DefWindowProc(mainWindow, message, wParam, lParam);
+			break;
+		}
+		break;
 
-
-    return 0;
+	default:
+		retval = DefWindowProc(mainWindow, message, wParam, lParam);
+		break;
+	}
+	return retval;
 }
+
+
